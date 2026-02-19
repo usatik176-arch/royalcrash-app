@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>RoyalCrash</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Cinzel+Decorative:wght@700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #c8a85a;
+    --gold-light: #f5d98b;
+    --gold-dark: #8a6a2a;
+    --bg-deep: #07070f;
+    --bg-card: #100e1c;
+    --bg-card2: #1a1730;
+    --purple: #b8a0ff;
+    --red: #ff4d6d;
+    --green: #4dff91;
+    --white: #f0eeff;
+    --dim: #6b6580;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+
+  body {
+    background: var(--bg-deep);
+    font-family: 'DM Sans', sans-serif;
+    color: var(--white);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Ambient background glow */
+  body::before {
+    content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
+    background:
+      radial-gradient(ellipse 60% 40% at 20% 0%, rgba(200,168,90,0.06) 0%, transparent 100%),
+      radial-gradient(ellipse 50% 50% at 80% 100%, rgba(184,160,255,0.04) 0%, transparent 100%);
+  }
+
+  .app { position:relative; z-index:1; max-width:430px; margin:0 auto; min-height:100vh; display:flex; flex-direction:column; }
+
+  /* ── HEADER ── */
+  .header {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:13px 16px 11px;
+    background:rgba(7,7,15,0.92);
+    backdrop-filter:blur(20px);
+    border-bottom:1px solid rgba(200,168,90,0.09);
+    position:sticky; top:0; z-index:100;
+  }
+
+  .logo-row { display:flex; align-items:center; gap:9px; }
+
+  .logo-mark {
+    width:34px; height:34px;
+    background:linear-gradient(145deg,rgba(200,168,90,0.12),rgba(200,168,90,0.04));
+    border:1px solid rgba(200,168,90,0.25);
+    border-radius:10px;
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 0 16px rgba(200,168,90,0.12), inset 0 1px 0 rgba(255,255,255,0.06);
+  }
+
+  .logo-text {
+    font-family:'Cinzel Decorative',serif; font-size:16px;
+    background:linear-gradient(130deg,var(--gold-light),var(--gold) 70%);
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+  }
+
+  .balances { display:flex; gap:8px; }
+
+  .bal {
+    display:flex; align-items:center; gap:5px;
+    background:rgba(255,255,255,0.03);
+    border:1px solid rgba(200,168,90,0.15);
+    border-radius:20px; padding:5px 11px 5px 8px;
+    font-family:'Cinzel',serif; font-size:12px; font-weight:600;
+    color:var(--gold-light);
+  }
+  .bal.stars { border-color:rgba(184,160,255,0.2); color:#d4c8ff; }
+
+  /* ── CRASH ZONE ── */
+  .crash-zone {
+    margin:12px; border-radius:20px;
+    background:linear-gradient(155deg,#0d0b1a,#110e1e);
+    border:1px solid rgba(200,168,90,0.1);
+    overflow:hidden; position:relative;
+    box-shadow:inset 0 1px 0 rgba(200,168,90,0.05), 0 20px 60px rgba(0,0,0,0.4);
+  }
+
+  .chart-wrap { width:100%; height:200px; position:relative; overflow:hidden; }
+  .chart-wrap canvas { position:absolute; inset:0; width:100%; height:100%; }
+
+  .mult-overlay {
+    position:absolute; top:50%; left:50%;
+    transform:translate(-50%,-50%);
+    text-align:center; pointer-events:none; z-index:5;
+  }
+
+  .mult-val {
+    font-family:'Cinzel',serif; font-size:52px; font-weight:700;
+    line-height:1; letter-spacing:-1px; transition:color .3s, text-shadow .3s;
+  }
+  .mult-val.run  { color:var(--gold-light); text-shadow:0 0 40px rgba(245,217,139,.55),0 0 80px rgba(245,217,139,.15); }
+  .mult-val.boom { color:var(--red); text-shadow:0 0 40px rgba(255,77,109,.6); }
+  .mult-val.idle { color:#2e2b4a; }
+
+  .mult-lbl { font-family:'Cinzel',serif; font-size:10px; letter-spacing:4px; text-transform:uppercase; color:var(--dim); margin-top:6px; }
+
+  /* Gem indicator on curve */
+  .curve-gem {
+    position:absolute; z-index:6; pointer-events:none;
+    transition:left .08s linear, bottom .08s linear;
+  }
+
+  /* History row */
+  .history {
+    display:flex; gap:6px; padding:10px 14px;
+    overflow-x:auto; scrollbar-width:none;
+    border-top:1px solid rgba(255,255,255,0.04);
+  }
+  .history::-webkit-scrollbar { display:none; }
+  .hchip {
+    flex-shrink:0; padding:4px 10px; border-radius:20px;
+    font-size:11px; font-weight:700; font-family:'Cinzel',serif;
+  }
+  .hchip.hi { background:rgba(77,255,145,.08); color:var(--green); border:1px solid rgba(77,255,145,.18); }
+  .hchip.md { background:rgba(200,168,90,.08); color:var(--gold); border:1px solid rgba(200,168,90,.18); }
+  .hchip.lo { background:rgba(255,77,109,.08); color:var(--red); border:1px solid rgba(255,77,109,.14); }
+
+  /* Countdown overlay */
+  .cdoverlay {
+    position:absolute; inset:0; z-index:10;
+    background:rgba(7,7,15,.8); backdrop-filter:blur(8px);
+    border-radius:20px;
+    display:flex; align-items:center; justify-content:center;
+    opacity:0; pointer-events:none; transition:opacity .3s;
+  }
+  .cdoverlay.on { opacity:1; pointer-events:all; }
+  .cdnum {
+    font-family:'Cinzel Decorative',serif; font-size:66px;
+    color:var(--gold-light);
+    text-shadow:0 0 60px rgba(245,217,139,.7);
+    animation:pop 1s ease-out forwards;
+  }
+  @keyframes pop {
+    0%   { transform:scale(1.5); opacity:0; }
+    20%  { opacity:1; transform:scale(1); }
+    75%  { opacity:1; }
+    100% { opacity:0; transform:scale(.6); }
+  }
+
+  /* ── BET CARD ── */
+  .bet-card {
+    margin:0 12px 12px;
+    background:linear-gradient(155deg,#0d0b1a,#110e1e);
+    border:1px solid rgba(200,168,90,0.09);
+    border-radius:20px; padding:16px;
+    display:flex; flex-direction:column; gap:13px;
+    box-shadow:inset 0 1px 0 rgba(200,168,90,0.04);
+  }
+
+  .bet-row { display:flex; align-items:center; gap:10px; }
+
+  .lbl {
+    font-family:'Cinzel',serif; font-size:9px; letter-spacing:2.5px;
+    text-transform:uppercase; color:var(--dim); min-width:52px;
+  }
+
+  .inp-wrap {
+    flex:1; display:flex; align-items:center;
+    background:rgba(255,255,255,0.03);
+    border:1px solid rgba(200,168,90,0.12);
+    border-radius:12px; overflow:hidden;
+    transition:border-color .2s;
+  }
+  .inp-wrap:focus-within { border-color:rgba(200,168,90,0.35); }
+  .inp-wrap .ico { padding:0 9px; display:flex; align-items:center; }
+  .inp-wrap input {
+    flex:1; background:none; border:none; outline:none;
+    color:var(--white); font-family:'Cinzel',serif;
+    font-size:17px; font-weight:600;
+    padding:10px 10px 10px 0; width:0;
+  }
+
+  .qbtns { display:flex; gap:6px; }
+  .qbtn {
+    background:rgba(200,168,90,0.05); border:1px solid rgba(200,168,90,0.14);
+    border-radius:8px; color:var(--gold); font-size:12px;
+    font-family:'Cinzel',serif; padding:7px 10px; cursor:pointer; transition:all .18s;
+  }
+  .qbtn:active { background:rgba(200,168,90,0.2); transform:scale(.94); }
+
+  .toggle {
+    width:38px; height:22px; border-radius:11px;
+    background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.08);
+    position:relative; cursor:pointer; transition:background .3s, border-color .3s;
+    flex-shrink:0;
+  }
+  .toggle.on { background:var(--gold); border-color:var(--gold-dark); }
+  .toggle::after {
+    content:''; position:absolute;
+    width:16px; height:16px; background:white;
+    border-radius:50%; top:2px; left:2px;
+    transition:transform .28s; box-shadow:0 1px 4px rgba(0,0,0,.5);
+  }
+  .toggle.on::after { transform:translateX(15px); }
+
+  /* MAIN CTA */
+  .cta {
+    width:100%; padding:15px; border-radius:14px; border:none;
+    font-family:'Cinzel',serif; font-size:14px; font-weight:700; letter-spacing:3px;
+    cursor:pointer; transition:all .22s; display:flex; flex-direction:column; align-items:center; gap:2px;
+    position:relative; overflow:hidden;
+  }
+  .cta::after {
+    content:''; position:absolute; inset:0;
+    background:linear-gradient(90deg,transparent,rgba(255,255,255,0.07),transparent);
+    transform:translateX(-100%); transition:transform .5s;
+  }
+  .cta:hover::after { transform:translateX(100%); }
+
+  .cta.place {
+    background:linear-gradient(135deg,#5a3d08,var(--gold),var(--gold-light));
+    color:#080501; box-shadow:0 4px 24px rgba(200,168,90,.38), inset 0 1px 0 rgba(255,255,255,.18);
+  }
+  .cta.place:active { transform:scale(.98); }
+
+  .cta.cashout {
+    background:linear-gradient(135deg,#083318,#1a5c34,var(--green));
+    color:#030f07; box-shadow:0 4px 24px rgba(77,255,145,.32);
+    animation:gpulse 1.2s ease-in-out infinite;
+  }
+  @keyframes gpulse {
+    0%,100% { box-shadow:0 4px 20px rgba(77,255,145,.28); }
+    50% { box-shadow:0 4px 40px rgba(77,255,145,.55); }
+  }
+
+  .cta.off {
+    background:rgba(255,255,255,.025); border:1px solid rgba(200,168,90,.1);
+    color:var(--dim); cursor:default;
+  }
+
+  .cta-sub { font-size:10px; font-family:'DM Sans',sans-serif; font-weight:400; letter-spacing:1px; opacity:.55; }
+
+  /* ── PLAYERS ── */
+  .players { margin:0 12px 12px; }
+
+  .players-hd {
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom:10px;
+  }
+  .players-title {
+    font-family:'Cinzel',serif; font-size:9px; letter-spacing:3px;
+    text-transform:uppercase; color:var(--gold); opacity:.55;
+    display:flex; align-items:center; gap:8px;
+  }
+  .players-cnt { font-size:11px; color:var(--dim); }
+
+  .plist {
+    display:flex; flex-direction:column; gap:5px;
+    max-height:185px; overflow-y:auto; scrollbar-width:none;
+  }
+  .plist::-webkit-scrollbar { display:none; }
+
+  .prow {
+    display:flex; align-items:center; gap:10px;
+    background:rgba(255,255,255,0.02);
+    border:1px solid rgba(255,255,255,0.03);
+    border-radius:12px; padding:9px 14px; transition:all .35s;
+  }
+  .prow.won { border-color:rgba(77,255,145,.18); background:rgba(77,255,145,.035); }
+  .prow.lost { opacity:.4; }
+
+  .pav {
+    width:28px; height:28px; border-radius:8px;
+    background:rgba(200,168,90,0.07); border:1px solid rgba(200,168,90,0.16);
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+  .pname { flex:1; font-size:13px; font-weight:500; opacity:.85; }
+  .pbet { font-size:11px; color:var(--dim); font-family:'Cinzel',serif; }
+  .pcash { font-family:'Cinzel',serif; font-size:12px; font-weight:700; color:var(--green); min-width:48px; text-align:right; }
+  .pcash.lost { color:var(--red); }
+
+  /* ── NAV ── */
+  .nav {
+    position:sticky; bottom:0;
+    background:rgba(7,7,15,0.97); backdrop-filter:blur(24px);
+    border-top:1px solid rgba(200,168,90,0.09);
+    display:flex; padding:9px 0 max(9px,env(safe-area-inset-bottom));
+    margin-top:auto;
+  }
+
+  .nb {
+    flex:1; display:flex; flex-direction:column; align-items:center; gap:4px;
+    padding:4px; border:none; background:none; cursor:pointer;
+    color:var(--dim); transition:color .2s; position:relative;
+  }
+  .nb.active { color:var(--gold); }
+  .nb.active::before {
+    content:''; position:absolute; top:0; left:50%; transform:translateX(-50%);
+    width:22px; height:2px;
+    background:linear-gradient(90deg,transparent,var(--gold),transparent);
+    border-radius:0 0 3px 3px;
+  }
+
+  .nb-ico { width:24px; height:24px; display:flex; align-items:center; justify-content:center; transition:transform .18s; }
+  .nb:active .nb-ico { transform:scale(.85); }
+  .nb.active .nb-ico svg { filter:drop-shadow(0 0 5px rgba(200,168,90,.5)); }
+
+  .nb-lbl { font-family:'Cinzel',serif; font-size:8px; letter-spacing:1px; text-transform:uppercase; font-weight:600; }
+
+  /* Toast */
+  .toast {
+    position:fixed; top:66px; left:50%;
+    transform:translateX(-50%) translateY(-8px);
+    background:linear-gradient(135deg,#1a1730,#0e0c1a);
+    border:1px solid rgba(200,168,90,0.25); border-radius:12px;
+    padding:9px 20px; font-family:'Cinzel',serif; font-size:11px;
+    color:var(--gold-light); letter-spacing:1px;
+    opacity:0; transition:all .28s; pointer-events:none; z-index:999;
+    white-space:nowrap; box-shadow:0 8px 30px rgba(0,0,0,.5);
+  }
+  .toast.on { opacity:1; transform:translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- HEADER -->
+  <header class="header">
+    <div class="logo-row">
+      <div class="logo-mark">
+        <!-- Crown SVG icon -->
+        <svg width="18" height="15" viewBox="0 0 18 15" fill="none">
+          <path d="M1.5 12.5h15M2 12.5L1 4.5l4.5 4 3.5-7 3.5 7 4.5-4-1 8H2z"
+            stroke="url(#hcg)" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round"/>
+          <circle cx="9" cy="4" r="1.4" fill="url(#hcg)"/>
+          <circle cx="1.5" cy="5" r="1" fill="url(#hcg)" opacity=".6"/>
+          <circle cx="16.5" cy="5" r="1" fill="url(#hcg)" opacity=".6"/>
+          <defs>
+            <linearGradient id="hcg" x1="1" y1="1" x2="17" y2="14" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#f5d98b"/><stop offset="1" stop-color="#c8a85a"/>
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+      <div class="logo-text">RoyalCrash</div>
+    </div>
+    <div class="balances">
+      <!-- TON balance -->
+      <div class="bal">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+          <polygon points="6.5,1 12,4.5 12,8.5 6.5,12 1,8.5 1,4.5" stroke="#c8a85a" stroke-width="1.1" fill="rgba(200,168,90,0.12)"/>
+          <line x1="6.5" y1="1" x2="6.5" y2="12" stroke="#c8a85a" stroke-width=".6" opacity=".4"/>
+          <line x1="1" y1="4.5" x2="12" y2="4.5" stroke="#c8a85a" stroke-width=".6" opacity=".4"/>
+          <line x1="1" y1="8.5" x2="12" y2="8.5" stroke="#c8a85a" stroke-width=".6" opacity=".4"/>
+        </svg>
+        <span id="bal-ton">0.06</span>
+      </div>
+      <!-- Stars balance -->
+      <div class="bal stars">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+          <polygon points="6.5,1 8,5 12,5.5 9,8.5 10,12.5 6.5,10.5 3,12.5 4,8.5 1,5.5 5,5"
+            stroke="#b8a0ff" stroke-width="1.1" fill="rgba(184,160,255,0.1)" stroke-linejoin="round"/>
+        </svg>
+        <span id="bal-star">0</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- CRASH ZONE -->
+  <div class="crash-zone">
+    <div class="chart-wrap">
+      <canvas id="chart"></canvas>
+
+      <div class="mult-overlay">
+        <div class="mult-val idle" id="mval">1.00x</div>
+        <div class="mult-lbl" id="mlbl">СЛЕДУЮЩИЙ РАУНД</div>
+      </div>
+
+      <!-- SVG gem that rides the curve -->
+      <svg class="curve-gem" id="cgem" width="22" height="22" viewBox="0 0 22 22" style="left:16px;bottom:18px">
+        <defs>
+          <linearGradient id="gg" x1="0" y1="0" x2="1" y2="1">
+            <stop stop-color="#f5d98b"/><stop offset=".5" stop-color="#c8a85a"/><stop offset="1" stop-color="#8a6a2a"/>
+          </linearGradient>
+        </defs>
+        <polygon points="11,1.5 20.5,7 20.5,15 11,20.5 1.5,15 1.5,7" fill="url(#gg)" opacity=".95"/>
+        <polygon points="11,1.5 20.5,7 11,8.5 1.5,7" fill="rgba(255,255,255,0.22)"/>
+        <line x1="11" y1="1.5" x2="11" y2="8.5" stroke="rgba(255,255,255,0.35)" stroke-width=".8"/>
+        <line x1="1.5" y1="7" x2="20.5" y2="7" stroke="rgba(255,255,255,0.1)" stroke-width=".6"/>
+      </svg>
+    </div>
+
+    <!-- Countdown overlay -->
+    <div class="cdoverlay" id="cdo">
+      <div>
+        <div class="cdnum" id="cdn">3</div>
+      </div>
+    </div>
+
+    <!-- History chips -->
+    <div class="history" id="hist">
+      <div class="hchip hi">50.68x</div>
+      <div class="hchip md">2.31x</div>
+      <div class="hchip lo">1.12x</div>
+      <div class="hchip hi">14.47x</div>
+      <div class="hchip md">3.80x</div>
+      <div class="hchip lo">1.05x</div>
+      <div class="hchip md">4.22x</div>
+    </div>
+  </div>
+
+  <!-- BET CARD -->
+  <div class="bet-card">
+    <div class="bet-row">
+      <span class="lbl">Ставка</span>
+      <div class="inp-wrap">
+        <span class="ico">
+          <!-- TON mini gem -->
+          <svg width="14" height="14" viewBox="0 0 13 13" fill="none">
+            <polygon points="6.5,1 12,4.5 12,8.5 6.5,12 1,8.5 1,4.5" stroke="#c8a85a" stroke-width="1.1" fill="rgba(200,168,90,0.1)"/>
+            <line x1="6.5" y1="1" x2="6.5" y2="12" stroke="#c8a85a" stroke-width=".6" opacity=".4"/>
+          </svg>
+        </span>
+        <input type="number" id="bet-in" value="0.10" min="0.01" step="0.01">
+      </div>
+      <div class="qbtns">
+        <button class="qbtn" onclick="mb(2)">×2</button>
+        <button class="qbtn" onclick="mb(.5)">½</button>
+      </div>
+    </div>
+
+    <div class="bet-row">
+      <span class="lbl">Авто</span>
+      <div style="flex:1;display:flex;align-items:center;gap:8px">
+        <button class="toggle" id="tog" onclick="toggleAuto()"></button>
+        <div class="inp-wrap" style="flex:1">
+          <span class="ico">
+            <!-- X multiply icon -->
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+              <line x1="2.5" y1="2.5" x2="10.5" y2="10.5" stroke="#b8a0ff" stroke-width="1.5" stroke-linecap="round"/>
+              <line x1="10.5" y1="2.5" x2="2.5" y2="10.5" stroke="#b8a0ff" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </span>
+          <input type="number" id="auto-in" value="2.00" min="1.01" step="0.01" style="font-size:15px">
+        </div>
+      </div>
+    </div>
+
+    <button class="cta place" id="cta" onclick="handleBet()">
+      <span id="cta-t">ПОСТАВИТЬ</span>
+      <span class="cta-sub" id="cta-s">нажми до начала раунда</span>
+    </button>
+  </div>
+
+  <!-- PLAYERS -->
+  <div class="players">
+    <div class="players-hd">
+      <div class="players-title">
+        <!-- Users icon -->
+        <svg width="14" height="11" viewBox="0 0 14 11" fill="none">
+          <circle cx="4.5" cy="3" r="2.2" stroke="currentColor" stroke-width="1.1" fill="none" opacity=".7"/>
+          <circle cx="9.5" cy="3" r="2.2" stroke="currentColor" stroke-width="1.1" fill="none" opacity=".7"/>
+          <path d="M1 10c0-2 1.5-3.5 3.5-3.5M9.5 6.5c2 0 3.5 1.5 3.5 3.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/>
+          <path d="M4.5 6.5c2 0 3.5 1.5 3.5 3.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/>
+        </svg>
+        Игроки раунда
+      </div>
+      <div class="players-cnt" id="pcnt">0 игроков</div>
+    </div>
+    <div class="plist" id="plist"></div>
+  </div>
+
+  <!-- NAVBAR -->
+  <nav class="nav">
+
+    <!-- CRASH — lightning bolt -->
+    <button class="nb active" onclick="setNav(this)">
+      <div class="nb-ico">
+        <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+          <path d="M13 2.5L4.5 13h6l-2.5 6.5 10-11.5h-6.5L13 2.5z"
+            stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"
+            fill="rgba(200,168,90,0.08)"/>
+        </svg>
+      </div>
+      <span class="nb-lbl">Краш</span>
+    </button>
+
+    <!-- CASES — chest / diamond -->
+    <button class="nb" onclick="setNav(this)">
+      <div class="nb-ico">
+        <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+          <path d="M11 2L20 7.5v7L11 20 2 14.5v-7L11 2z"
+            stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="none"/>
+          <path d="M2 7.5l9 5 9-5" stroke="currentColor" stroke-width="1.2" opacity=".4" stroke-linecap="round"/>
+          <path d="M11 12.5V20" stroke="currentColor" stroke-width="1.2" opacity=".4" stroke-linecap="round"/>
+          <path d="M6.5 4.8L11 9.5l4.5-4.7" stroke="currentColor" stroke-width="1" opacity=".35" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <span class="nb-lbl">Кейсы</span>
+    </button>
+
+    <!-- LEADERBOARD — crown -->
+    <button class="nb" onclick="setNav(this)">
+      <div class="nb-ico">
+        <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+          <path d="M3 17.5h16M3.5 17.5L2.5 7l5 5L11 3l3 9 5-5-1 10.5H3.5z"
+            stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" fill="none"/>
+          <circle cx="11" cy="5.5" r="1.5" fill="currentColor" opacity=".6"/>
+        </svg>
+      </div>
+      <span class="nb-lbl">Лидеры</span>
+    </button>
+
+    <!-- REFERRALS — link -->
+    <button class="nb" onclick="setNav(this)">
+      <div class="nb-ico">
+        <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+          <path d="M9 13c.9 1.3 2.7 1.8 4 1l3-3a3.2 3.2 0 0 0-4.5-4.5l-1.7 1.7"
+            stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          <path d="M13 9c-.9-1.3-2.7-1.8-4-1L6 11a3.2 3.2 0 0 0 4.5 4.5l1.7-1.7"
+            stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <span class="nb-lbl">Рефералы</span>
+    </button>
+
+    <!-- PROFILE — person -->
+    <button class="nb" onclick="setNav(this)">
+      <div class="nb-ico">
+        <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+          <circle cx="11" cy="7.5" r="3.8" stroke="currentColor" stroke-width="1.5" fill="none"/>
+          <path d="M3 20c0-4.4 3.6-8 8-8s8 3.6 8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <span class="nb-lbl">Профиль</span>
+    </button>
+
+  </nav>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// Nav
+function setNav(el) {
+  document.querySelectorAll('.nb').forEach(n => n.classList.remove('active'));
+  el.classList.add('active');
+}
+
+// ── STATE ──
+const S = {
+  phase: 'waiting', mult: 1, crashAt: 1,
+  betPlaced: false, cashedOut: false,
+  betAmt: 0.1, autoOn: false, autoAt: 2,
+  balance: 0.06, startTime: 0, raf: null,
+  players: [],
+};
+
+const NAMES = ['Dread','MOON·112','Максимильян','Sapsan','Rasta','Andrey','NN','Лёха','ZONAR','GG','Danik','Успешный'];
+
+// ── CANVAS ──
+const cv = document.getElementById('chart'), cx = cv.getContext('2d');
+let pts = [];
+
+function resize() {
+  const r = devicePixelRatio || 1;
+  cv.width = cv.offsetWidth * r; cv.height = cv.offsetHeight * r;
+  cx.setTransform(r,0,0,r,0,0);
+}
+resize(); window.addEventListener('resize', resize);
+
+function draw() {
+  const W = cv.offsetWidth, H = cv.offsetHeight;
+  cx.clearRect(0,0,W,H);
+  if (pts.length < 2) return;
+
+  const crashed = S.phase === 'crashed';
+  const lc = crashed ? '#ff4d6d' : '#c8a85a';
+  const gk = crashed ? 'rgba(255,77,109,' : 'rgba(200,168,90,';
+
+  // subtle grid
+  cx.strokeStyle = 'rgba(200,168,90,0.035)'; cx.lineWidth = 1;
+  for (let i=1;i<5;i++) { cx.beginPath(); cx.moveTo(0,H*i/5); cx.lineTo(W,H*i/5); cx.stroke(); }
+
+  // fill gradient
+  const g = cx.createLinearGradient(0,H,W,0);
+  g.addColorStop(0, gk+'0)'); g.addColorStop(1, gk+'0.16)');
+  cx.beginPath();
+  cx.moveTo(pts[0].x*W, H);
+  pts.forEach(p => cx.lineTo(p.x*W, H - p.y*H*.83));
+  cx.lineTo(pts[pts.length-1].x*W, H);
+  cx.closePath(); cx.fillStyle=g; cx.fill();
+
+  // glow line
+  cx.shadowColor = lc; cx.shadowBlur = 10;
+  cx.beginPath();
+  cx.moveTo(pts[0].x*W, H-pts[0].y*H*.83);
+  pts.forEach(p => cx.lineTo(p.x*W, H-p.y*H*.83));
+  cx.strokeStyle=lc; cx.lineWidth=2.6; cx.lineJoin='round'; cx.stroke();
+  cx.shadowBlur=0;
+
+  // gem pos
+  const l = pts[pts.length-1];
+  const lx=l.x*W, ly=H-l.y*H*.83;
+  const gem = document.getElementById('cgem');
+  gem.style.left=(lx-11)+'px'; gem.style.bottom=(H-ly-11)+'px';
+  gem.style.display = crashed ? 'none' : 'block';
+}
+
+// ── GAME ──
+function genCrash() {
+  const r = Math.random();
+  if (r<.35) return 1+Math.random()*.45;
+  if (r<.6)  return 1.5+Math.random()*2.5;
+  if (r<.8)  return 4+Math.random()*12;
+  if (r<.95) return 16+Math.random()*50;
+  return 60+Math.random()*200;
+}
+
+function countdown() {
+  S.phase='countdown'; S.betPlaced=false; S.cashedOut=false;
+  pts=[]; genPlayers();
+  const ov=document.getElementById('cdo'), ne=document.getElementById('cdn');
+  ov.classList.add('on');
+  document.getElementById('mval').className='mult-val idle';
+  document.getElementById('mval').textContent='1.00x';
+  document.getElementById('mlbl').textContent='СЛЕДУЮЩИЙ РАУНД';
+  updBtn(); draw();
+  let c=3;
+  const tick=()=>{
+    ne.textContent=c; ne.style.animation='none'; void ne.offsetWidth; ne.style.animation='pop 1s ease-out forwards';
+    if(c-->0) setTimeout(tick,1000);
+    else { ov.classList.remove('on'); startRound(); }
+  };
+  tick();
+}
+
+function startRound() {
+  S.phase='running'; S.mult=1; S.crashAt=genCrash(); S.startTime=performance.now();
+  pts=[{x:0,y:0}];
+  document.getElementById('mval').className='mult-val run';
+  document.getElementById('mlbl').textContent='В РАУНДЕ';
+  updBtn(); loop();
+}
+
+function loop() {
+  const el=(performance.now()-S.startTime)/1000;
+  S.mult=Math.pow(Math.E, el*.15);
+  const maxT=Math.log(S.crashAt)/.15;
+  const prog=el/(maxT+.001);
+  pts.push({x:Math.min(prog,1), y:Math.min(S.mult/(S.crashAt*1.1),1)});
+
+  document.getElementById('mval').textContent=S.mult.toFixed(2)+'x';
+  if(S.betPlaced&&!S.cashedOut) {
+    document.getElementById('cta-t').textContent='ВЫВЕСТИ '+(S.betAmt*S.mult).toFixed(3);
+    document.getElementById('cta-s').textContent='× '+S.mult.toFixed(2);
+  }
+  if(S.autoOn&&S.betPlaced&&!S.cashedOut&&S.mult>=S.autoAt) cashout();
+  updPlayers(); draw();
+  if(S.mult>=S.crashAt) { crash(); return; }
+  S.raf=requestAnimationFrame(loop);
+}
+
+function crash() {
+  S.phase='crashed'; cancelAnimationFrame(S.raf);
+  document.getElementById('mval').className='mult-val boom';
+  document.getElementById('mval').textContent=S.crashAt.toFixed(2)+'x';
+  document.getElementById('mlbl').textContent='КРАШ';
+
+  const hist=document.getElementById('hist'), ch=document.createElement('div');
+  const v=S.crashAt;
+  ch.className='hchip '+(v>=10?'hi':v>=2?'md':'lo');
+  ch.textContent=v.toFixed(2)+'x';
+  hist.insertBefore(ch,hist.firstChild);
+
+  if(S.betPlaced&&!S.cashedOut) toast('Краш — ставка проиграна');
+  updBtn(); draw(); lostPlayers();
+  setTimeout(countdown, 3500);
+}
+
+function cashout() {
+  if(!S.betPlaced||S.cashedOut) return;
+  S.cashedOut=true;
+  const w=S.betAmt*S.mult; S.balance+=w;
+  document.getElementById('bal-ton').textContent=S.balance.toFixed(2);
+  toast('Выведено '+w.toFixed(3)+' TON · '+S.mult.toFixed(2)+'x');
+  updBtn();
+}
+
+function handleBet() {
+  if(S.phase==='running'&&S.betPlaced&&!S.cashedOut){cashout();return;}
+  if(S.phase==='running') return;
+  const v=parseFloat(document.getElementById('bet-in').value);
+  if(!v||v<=0){toast('Введите сумму');return;}
+  if(v>S.balance){toast('Недостаточно средств');return;}
+  S.betAmt=v; S.betPlaced=true; S.balance-=v;
+  document.getElementById('bal-ton').textContent=S.balance.toFixed(2);
+  toast('Ставка '+v.toFixed(2)+' TON принята');
+  updBtn();
+}
+
+function updBtn() {
+  const b=document.getElementById('cta'), t=document.getElementById('cta-t'), s=document.getElementById('cta-s');
+  if(S.phase==='running'&&S.betPlaced&&!S.cashedOut){
+    b.className='cta cashout'; t.textContent='ВЫВЕСТИ '+(S.betAmt*S.mult).toFixed(3); s.textContent='× '+S.mult.toFixed(2);
+  } else if(S.betPlaced){
+    b.className='cta off'; t.textContent='СТАВКА ПРИНЯТА'; s.textContent=S.betAmt.toFixed(2)+' TON';
+  } else {
+    b.className='cta place'; t.textContent='ПОСТАВИТЬ'; s.textContent='нажми до начала раунда';
+  }
+}
+
+function mb(f) {
+  const i=document.getElementById('bet-in');
+  i.value=Math.max(.01,parseFloat(i.value)*f).toFixed(2);
+}
+function toggleAuto() {
+  S.autoOn=!S.autoOn;
+  document.getElementById('tog').classList.toggle('on',S.autoOn);
+}
+
+// ── PLAYERS ──
+// SVG avatar icons: crown, gem, shield, sword, star, rook
+const AVICONS = [
+  `<svg width="14" height="12" viewBox="0 0 14 12" fill="none"><path d="M1 10h12M1.5 10L1 3.5l3.5 3L7 1l2.5 5.5 3.5-3L12.5 10H1.5z" stroke="#c8a85a" stroke-width="1.1" stroke-linejoin="round"/><circle cx="7" cy="3" r="1" fill="#c8a85a" opacity=".8"/></svg>`,
+  `<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1.5L13 5.5v3L7 12.5 1 8.5v-3L7 1.5z" stroke="#b8a0ff" stroke-width="1.1"/><line x1="1" y1="5.5" x2="13" y2="5.5" stroke="#b8a0ff" stroke-width=".7" opacity=".4"/><line x1="7" y1="1.5" x2="7" y2="5.5" stroke="#b8a0ff" stroke-width=".7" opacity=".4"/></svg>`,
+  `<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1.5L12.5 4.5v4c0 2.5-2.5 4-5.5 4.5C3.5 12.5 1 11 1 8.5v-4L7 1.5z" stroke="#4dff91" stroke-width="1.1"/><path d="M4.5 7.5l2 2 3.5-3.5" stroke="#4dff91" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  `<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><line x1="3" y1="11" x2="10" y2="4" stroke="#f5d98b" stroke-width="1.3" stroke-linecap="round"/><path d="M8.5 2.5L11.5 5.5 10 4z" stroke="#f5d98b" stroke-width="1"/><line x1="3.5" y1="9.5" x2="5.5" y2="9.5" stroke="#f5d98b" stroke-width="1" stroke-linecap="round"/></svg>`,
+  `<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><polygon points="7,1.5 8.5,5.5 12.5,5.5 9.5,8.5 10.5,12.5 7,10 3.5,12.5 4.5,8.5 1.5,5.5 5.5,5.5" stroke="#f5d98b" stroke-width="1" fill="rgba(245,217,139,0.08)" stroke-linejoin="round"/></svg>`,
+  `<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="3" y="1.5" width="3" height="2" rx=".5" stroke="#b8a0ff" stroke-width="1"/><rect x="8" y="1.5" width="3" height="2" rx=".5" stroke="#b8a0ff" stroke-width="1"/><path d="M3 3.5h8v9H3z" stroke="#b8a0ff" stroke-width="1.1"/><line x1="7" y1="3.5" x2="7" y2="12.5" stroke="#b8a0ff" stroke-width=".7" opacity=".5"/></svg>`,
+];
+
+function genPlayers() {
+  S.players=[];
+  const n=5+Math.floor(Math.random()*8);
+  for(let i=0;i<n;i++) S.players.push({
+    name:NAMES[i%NAMES.length],
+    icon:AVICONS[Math.floor(Math.random()*AVICONS.length)],
+    bet:(0.05+Math.random()*4).toFixed(2),
+    coAt:(1.2+Math.random()*7).toFixed(2),
+    co:false,lost:false,
+  });
+  renderPlayers();
+}
+
+function updPlayers() {
+  S.players.forEach(p=>{ if(!p.co&&parseFloat(p.coAt)<=S.mult) p.co=true; });
+  renderPlayers();
+}
+
+function lostPlayers() {
+  S.players.forEach(p=>{ if(!p.co) p.lost=true; });
+  renderPlayers();
+}
+
+function renderPlayers() {
+  const l=document.getElementById('plist');
+  l.innerHTML=''; document.getElementById('pcnt').textContent=S.players.length+' игроков';
+  S.players.forEach(p=>{
+    const r=document.createElement('div');
+    r.className='prow'+(p.co?' won':'')+(p.lost?' lost':'');
+    r.innerHTML=`<div class="pav">${p.icon}</div><div class="pname">${p.name}</div><div class="pbet">${p.bet} TON</div><div class="pcash ${p.lost?'lost':''}">${p.co?p.coAt+'x':p.lost?'—':'·'}</div>`;
+    l.appendChild(r);
+  });
+}
+
+// ── TOAST ──
+function toast(msg) {
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('on');
+  setTimeout(()=>t.classList.remove('on'),2400);
+}
+
+// ── BOOT ──
+genPlayers(); countdown();
+</script>
+</body>
+</html>
